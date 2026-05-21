@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: degenius-whatsapp-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: PHONE_NUMBER_ID
+        sync: false
+      - key: VERIFY_TOKEN
+        sync: false
+      - key: CLAUDE_API_KEY
+        sync: false
