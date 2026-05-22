@@ -22,7 +22,9 @@ def send_whatsapp_message(to, message):
         "type": "text",
         "text": {"body": message}
     }
-    requests.post(url, headers=headers, json=data)
+    response = requests.post(url, headers=headers, json=data)
+    print(response.status_code)
+    print(response.text)
 
 @app.route("/webhook", methods=["GET"])
 def verify_webhook():
@@ -48,7 +50,8 @@ def webhook():
                 ai_response = get_claude_response(from_number, user_message)
                 send_whatsapp_message(from_number, ai_response)
     except Exception as e:
-        print(f"Error: {e}")
+        import traceback
+        print(traceback.format_exc())
     return "OK", 200
 
 if __name__ == "__main__":
