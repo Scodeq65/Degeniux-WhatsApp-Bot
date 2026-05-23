@@ -75,7 +75,7 @@ def get_claude_response(user_id, user_message):
         conversation_history[user_id] = conversation_history[user_id][-20:]
     
     response = client.messages.create(
-        model="claude-3-5-sonnet-20241022",
+        model="claude-sonnet-4-6",
         max_tokens=500,
         system=SYSTEM_PROMPT,
         messages=conversation_history[user_id]
