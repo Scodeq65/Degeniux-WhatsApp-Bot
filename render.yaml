@@ -5,7 +5,7 @@ services:
     region: frankfurt
     plan: free
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT"
+    startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120"
     envVars:
       - key: WHATSAPP_TOKEN
         sync: false
@@ -14,4 +14,14 @@ services:
       - key: VERIFY_TOKEN
         sync: false
       - key: CLAUDE_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: RENDER_URL
+        sync: false
+      - key: CONTROL_SECRET
         sync: false
