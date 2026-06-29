@@ -1,0 +1,45 @@
+{
+  "registration": [
+    {
+      "key": "business_name",
+      "aliases": ["business name", "bn", "business", "enterprise", "sole proprietorship", "sole trader"],
+      "requires_name_check": true,
+      "requires_nature": true
+    },
+    {
+      "key": "ltd",
+      "aliases": ["limited", "ltd", "limited company", "company", "llc", "incorporated", "inc"],
+      "requires_name_check": true,
+      "requires_nature": true
+    },
+    {
+      "key": "ngo",
+      "aliases": ["ngo", "church", "mosque", "association", "foundation", "trustee", "charity", "nonprofit", "non profit"],
+      "requires_name_check": true,
+      "requires_nature": true
+    },
+    {
+      "key": "trademark",
+      "aliases": ["trademark", "trade mark", "brand", "logo protection", "intellectual property", "ip"],
+      "requires_name_check": false,
+      "requires_nature": false
+    },
+    {
+      "key": "scuml",
+      "aliases": ["scuml", "special control unit", "money laundering"],
+      "requires_name_check": false,
+      "requires_nature": false
+    }
+  ],
+  "post_registration": [
+    "annual returns",
+    "upgrade",
+    "bn to ltd",
+    "director change",
+    "address change",
+    "share capital",
+    "company name change",
+    "trustee amendment",
+    "amendment"
+  ]
+}
