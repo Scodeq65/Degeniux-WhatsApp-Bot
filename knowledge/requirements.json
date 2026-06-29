@@ -1,0 +1,114 @@
+{
+  "business_name": {
+    "intro": "Kindly provide the following for your Business Name registration:",
+    "sections": [
+      {
+        "title": "Business Information",
+        "items": [
+          "Business Address",
+          "Phone Number",
+          "Email Address",
+          "Valid ID (NIN Slip, Voter's Card, National ID, Driver's License or International Passport)",
+          "Passport photograph"
+        ]
+      },
+      {
+        "title": "Proprietor's Details",
+        "items": [
+          "Full Name",
+          "Date of Birth",
+          "Phone Number",
+          "Email Address",
+          "Residential Address",
+          "Occupation",
+          "Signature on a plain paper"
+        ]
+      }
+    ]
+  },
+  "ltd": {
+    "intro": "Kindly provide the following for your Limited Company Registration:",
+    "sections": [
+      {
+        "title": "Company Information",
+        "items": [
+          "Proposed Company Name(s) — minimum 2 to 3 options",
+          "Nature of Business",
+          "Registered Company Address"
+        ]
+      },
+      {
+        "title": "Directors' Details (for each director)",
+        "items": [
+          "Full Name",
+          "Date of Birth",
+          "Gender",
+          "Nationality",
+          "Occupation",
+          "Phone Number",
+          "Email Address",
+          "Residential Address",
+          "NIN (National Identification Number)"
+        ]
+      },
+      {
+        "title": "Additional Requirements",
+        "items": [
+          "Valid ID for all directors (National ID, NIN Slip, Voter's Card, Driver's License or International Passport)",
+          "Clear signature on plain paper",
+          "Witness Details: Full Name, Phone, Occupation, Address, Signature and NIN",
+          "Active company email address and phone number"
+        ]
+      }
+    ]
+  },
+  "ngo": {
+    "intro": "Kindly provide the following for your NGO / Incorporated Trustee Registration:",
+    "sections": [
+      {
+        "title": "Organization Information",
+        "items": [
+          "Proposed Name Options (2 options in order of preference)",
+          "Aims and Objectives of the Organization",
+          "Nature of Activities",
+          "Registered Office Address",
+          "Areas of Operation"
+        ]
+      },
+      {
+        "title": "Trustees' Information (minimum 2 trustees, for each trustee)",
+        "items": [
+          "Surname, First Name, Other Name",
+          "Date of Birth",
+          "Gender",
+          "Nationality",
+          "Occupation",
+          "Phone Number",
+          "Email Address",
+          "Residential Address"
+        ]
+      },
+      {
+        "title": "Executive Members",
+        "items": [
+          "Chairman",
+          "Secretary",
+          "Treasurer",
+          "Other Executives if any"
+        ]
+      },
+      {
+        "title": "Supporting Documents",
+        "items": [
+          "Valid ID for all trustees",
+          "Passport photographs for all trustees",
+          "Signatures on plain white paper",
+          "Constitution of the Organization",
+          "Minutes of Meeting showing appointment of trustees",
+          "Attendance list of the meeting",
+          "Organization logo (optional)"
+        ]
+      }
+    ]
+  }
+}
