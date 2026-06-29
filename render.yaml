@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: degenius-whatsapp-bot
+    name: Degenius-WhatsApp-Bot
     env: python
     region: frankfurt
     plan: free
@@ -24,4 +24,6 @@ services:
       - key: RENDER_URL
         sync: false
       - key: CONTROL_SECRET
+        sync: false
+      - key: FLASK_SECRET_KEY
         sync: false
