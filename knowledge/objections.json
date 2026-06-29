@@ -1,0 +1,26 @@
+{
+  "price_too_high": {
+    "triggers": ["expensive", "too much", "costly", "high price", "too high", "cannot afford", "overpriced"],
+    "approach": "Acknowledge first, then explain the 3-stage payment structure. Emphasize they only start with 20%. Focus on value and stress-free process."
+  },
+  "thinking_about_it": {
+    "triggers": ["let me think", "i will think", "think about it", "later", "not now", "maybe later", "give me time"],
+    "approach": "Respect their space but naturally mention that business names on CAC are first come first served. Be subtle — never pushy."
+  },
+  "legitimacy": {
+    "triggers": ["is this real", "legit", "scam", "fake", "can i trust", "how do i know", "proof"],
+    "approach": "Reassure confidently. CAC-compliant. Hundreds of registrations across Nigeria. Certificate issued directly by CAC. Fully official."
+  },
+  "no_money": {
+    "triggers": ["no money", "don't have money", "broke", "can't pay", "no funds", "struggling"],
+    "approach": "Emphasize the 3-stage structure. For Business Name, only ₦7,000 starts the process. Frame it as the most affordable way to protect their business name."
+  },
+  "price_reduction": {
+    "triggers": ["reduce", "discount", "cheaper", "promo", "negotiate", "bargain", "better price"],
+    "approach": "Acknowledge the request warmly. Explain that pricing already reflects top-quality service. Mention speed, expertise, and complete handling as the true value."
+  },
+  "diy": {
+    "triggers": ["do it myself", "register myself", "cac direct", "do it yourself", "self registration"],
+    "approach": "Acknowledge it's possible. Gently explain CAC portal complexity, common rejection reasons, name reservation risks, and how Degenius handles everything professionally."
+  }
+}
