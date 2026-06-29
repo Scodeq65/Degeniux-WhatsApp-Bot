@@ -1,6 +1,5 @@
 import logging
 import sys
-from datetime import datetime
 
 def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
@@ -14,3 +13,4 @@ def get_logger(name: str) -> logging.Logger:
         handler.setFormatter(formatter)
         logger.addHandler(handler)
     return logger
+    
