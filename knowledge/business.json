@@ -1,0 +1,21 @@
+{
+  "company_name": "Degenius Consult LTD",
+  "industry": "CAC Business Registration",
+  "tagline": "Professional. Fast. Nationwide.",
+  "country": "Nigeria",
+  "coverage": "Nationwide",
+  "delivery_method": "Digital — softcopy certificates",
+  "remote": true,
+  "payment": {
+    "bank": "Moniepoint MFB",
+    "account_number": "6735874829",
+    "account_name": "Degenius Consult LTD"
+  },
+  "contact": {
+    "whatsapp": "+2348099275848"
+  },
+  "greeting": "Hey! Welcome to Degenius Consult LTD. I'm Sodiq, one of the consultants here. How can I help you today?",
+  "consultant_name": "Sodiq",
+  "handover_message": "Perfect! I have everything I need. Our team will run a name availability check on the CAC portal and get back to you shortly. Thank you for choosing Degenius Consult LTD!",
+  "timezone": "Africa/Lagos"
+}
