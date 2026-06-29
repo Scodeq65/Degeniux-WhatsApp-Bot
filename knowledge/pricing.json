@@ -1,0 +1,71 @@
+{
+  "business_name": {
+    "label": "Business Name Registration",
+    "amount": 35000,
+    "currency": "NGN",
+    "symbol": "₦",
+    "timeline": "Same day or maximum 2 working days",
+    "payment_structure": "three_stage",
+    "stages": {
+      "stage_1": { "percent": 20, "amount": 7000, "trigger": "initial" },
+      "stage_2": { "percent": 60, "amount": 21000, "trigger": "after_reservation" },
+      "stage_3": { "percent": 20, "amount": 7000, "trigger": "on_certificate" }
+    }
+  },
+  "ltd": {
+    "label": "Limited Company (LTD) Registration",
+    "amount": 65000,
+    "currency": "NGN",
+    "symbol": "₦",
+    "timeline": "2 to 5 working days",
+    "payment_structure": "three_stage",
+    "stages": {
+      "stage_1": { "percent": 20, "amount": 13000, "trigger": "initial" },
+      "stage_2": { "percent": 60, "amount": 39000, "trigger": "after_reservation" },
+      "stage_3": { "percent": 20, "amount": 13000, "trigger": "on_certificate" }
+    }
+  },
+  "ngo": {
+    "label": "NGO / Church / Mosque / Association Registration",
+    "amount": 120000,
+    "currency": "NGN",
+    "symbol": "₦",
+    "timeline": "6 to 8 weeks",
+    "payment_structure": "three_stage",
+    "stages": {
+      "stage_1": { "percent": 20, "amount": 24000, "trigger": "initial" },
+      "stage_2": { "percent": 60, "amount": 72000, "trigger": "after_reservation" },
+      "stage_3": { "percent": 20, "amount": 24000, "trigger": "on_certificate" }
+    }
+  },
+  "trademark": {
+    "label": "Trademark Registration",
+    "amount": 60000,
+    "currency": "NGN",
+    "symbol": "₦",
+    "timeline": "Varies",
+    "payment_structure": "two_stage",
+    "stages": {
+      "stage_1": { "percent": 70, "amount": 42000, "trigger": "initial" },
+      "stage_2": { "percent": 30, "amount": 18000, "trigger": "on_completion" }
+    }
+  },
+  "scuml": {
+    "label": "SCUML Registration",
+    "amount": 35000,
+    "currency": "NGN",
+    "symbol": "₦",
+    "timeline": "Varies",
+    "payment_structure": "two_stage",
+    "stages": {
+      "stage_1": { "percent": 70, "amount": 24500, "trigger": "initial" },
+      "stage_2": { "percent": 30, "amount": 10500, "trigger": "on_completion" }
+    }
+  },
+  "post_registration": {
+    "label": "Post-Registration Services",
+    "amount": null,
+    "note": "Price varies by service type. Consultant will provide exact cost.",
+    "payment_structure": "custom"
+  }
+}
