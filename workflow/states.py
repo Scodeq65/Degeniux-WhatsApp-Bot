@@ -1,111 +1,90 @@
 from enum import Enum
 
 class State(str, Enum):
-    """
-    Finite State Machine states for Degenius WhatsApp AI Agent.
-    Each state represents a specific point in the lead conversion journey.
-    """
-
-    # Entry states
-    NEW_LEAD = "NEW_LEAD"
-    GREETING_SENT = "GREETING_SENT"
-
-    # Qualification states
-    SERVICE_IDENTIFIED = "SERVICE_IDENTIFIED"
+    NEW_LEAD            = "NEW_LEAD"
+    GREETING_SENT       = "GREETING_SENT"
+    SERVICE_IDENTIFIED  = "SERVICE_IDENTIFIED"
     WAITING_BUSINESS_NAME = "WAITING_BUSINESS_NAME"
     BUSINESS_NAME_RECEIVED = "BUSINESS_NAME_RECEIVED"
-    WAITING_NATURE = "WAITING_NATURE"
-    WAITING_PHONE = "WAITING_PHONE"
-    WAITING_EMAIL = "WAITING_EMAIL"
-
-    # Lead qualified
-    LEAD_QUALIFIED = "LEAD_QUALIFIED"
+    WAITING_NATURE      = "WAITING_NATURE"
+    LEAD_QUALIFIED      = "LEAD_QUALIFIED"
     WAITING_HUMAN_REVIEW = "WAITING_HUMAN_REVIEW"
-
-    # Human handover
-    HUMAN_ACTIVE = "HUMAN_ACTIVE"
-
-    # Registration states
-    NAME_CHECK_PENDING = "NAME_CHECK_PENDING"
-    NAME_AVAILABLE = "NAME_AVAILABLE"
-    NAME_UNAVAILABLE = "NAME_UNAVAILABLE"
-    WAITING_INITIAL_PAYMENT = "WAITING_INITIAL_PAYMENT"
-    INITIAL_PAYMENT_RECEIVED = "INITIAL_PAYMENT_RECEIVED"
+    HUMAN_ACTIVE        = "HUMAN_ACTIVE"
+    NAME_CHECK_PENDING  = "NAME_CHECK_PENDING"
+    NAME_AVAILABLE      = "NAME_AVAILABLE"
+    NAME_UNAVAILABLE    = "NAME_UNAVAILABLE"
+    WAITING_PAYMENT     = "WAITING_PAYMENT"
     REGISTRATION_IN_PROGRESS = "REGISTRATION_IN_PROGRESS"
-    WAITING_BALANCE_PAYMENT = "WAITING_BALANCE_PAYMENT"
-
-    # Terminal states
-    COMPLETED = "COMPLETED"
-    COLD_LEAD = "COLD_LEAD"
-    LOST = "LOST"
+    WAITING_BALANCE     = "WAITING_BALANCE"
+    COMPLETED           = "COMPLETED"
+    COLD_LEAD           = "COLD_LEAD"
+    LOST                = "LOST"
 
 
-# Valid transitions — FSM enforces these
 VALID_TRANSITIONS = {
-    State.NEW_LEAD: [State.GREETING_SENT],
-    State.GREETING_SENT: [State.SERVICE_IDENTIFIED],
-    State.SERVICE_IDENTIFIED: [State.WAITING_BUSINESS_NAME],
-    State.WAITING_BUSINESS_NAME: [State.BUSINESS_NAME_RECEIVED],
-    State.BUSINESS_NAME_RECEIVED: [State.WAITING_NATURE],
-    State.WAITING_NATURE: [State.WAITING_PHONE],
-    State.WAITING_PHONE: [State.WAITING_EMAIL],
-    State.WAITING_EMAIL: [State.LEAD_QUALIFIED],
-    State.LEAD_QUALIFIED: [State.WAITING_HUMAN_REVIEW, State.NAME_CHECK_PENDING],
-    State.WAITING_HUMAN_REVIEW: [State.HUMAN_ACTIVE, State.NAME_CHECK_PENDING],
-    State.HUMAN_ACTIVE: [State.NAME_CHECK_PENDING, State.GREETING_SENT],
-    State.NAME_CHECK_PENDING: [State.NAME_AVAILABLE, State.NAME_UNAVAILABLE],
-    State.NAME_UNAVAILABLE: [State.WAITING_BUSINESS_NAME],
-    State.NAME_AVAILABLE: [State.WAITING_INITIAL_PAYMENT],
-    State.WAITING_INITIAL_PAYMENT: [State.INITIAL_PAYMENT_RECEIVED],
-    State.INITIAL_PAYMENT_RECEIVED: [State.REGISTRATION_IN_PROGRESS],
-    State.REGISTRATION_IN_PROGRESS: [State.WAITING_BALANCE_PAYMENT],
-    State.WAITING_BALANCE_PAYMENT: [State.COMPLETED],
-    State.COMPLETED: [],
-    State.COLD_LEAD: [State.GREETING_SENT],
-    State.LOST: [],
+    State.NEW_LEAD:               [State.GREETING_SENT],
+    State.GREETING_SENT:          [State.SERVICE_IDENTIFIED],
+    State.SERVICE_IDENTIFIED:     [State.WAITING_BUSINESS_NAME],
+    State.WAITING_BUSINESS_NAME:  [State.BUSINESS_NAME_RECEIVED],
+    State.BUSINESS_NAME_RECEIVED: [State.WAITING_NATURE, State.LEAD_QUALIFIED],
+    State.WAITING_NATURE:         [State.LEAD_QUALIFIED],
+    State.LEAD_QUALIFIED:         [State.WAITING_HUMAN_REVIEW],
+    State.WAITING_HUMAN_REVIEW:   [State.HUMAN_ACTIVE, State.NAME_CHECK_PENDING],
+    State.HUMAN_ACTIVE:           [State.NAME_CHECK_PENDING, State.GREETING_SENT],
+    State.NAME_CHECK_PENDING:     [State.NAME_AVAILABLE, State.NAME_UNAVAILABLE],
+    State.NAME_UNAVAILABLE:       [State.WAITING_BUSINESS_NAME],
+    State.NAME_AVAILABLE:         [State.WAITING_PAYMENT],
+    State.WAITING_PAYMENT:        [State.REGISTRATION_IN_PROGRESS],
+    State.REGISTRATION_IN_PROGRESS: [State.WAITING_BALANCE],
+    State.WAITING_BALANCE:        [State.COMPLETED],
+    State.COMPLETED:              [],
+    State.COLD_LEAD:              [State.GREETING_SENT],
+    State.LOST:                   [],
 }
 
-# What information Claude must collect at each state
-STATE_REQUIREMENTS = {
-    State.WAITING_BUSINESS_NAME: "proposed_business_name",
-    State.WAITING_NATURE: "nature_of_business",
-    State.WAITING_PHONE: "phone_number",
-    State.WAITING_EMAIL: "email_address",
-}
-
-# Instructions Claude receives for each state
 STATE_INSTRUCTIONS = {
-    State.NEW_LEAD: "Greet the lead warmly and naturally. Ask what brings them here today. Do not mention any services yet.",
+    State.NEW_LEAD:
+        "Greet the lead warmly and naturally. Ask what brings them here today. Do not mention any service yet. Be brief — 1 to 2 sentences.",
 
-    State.GREETING_SENT: "The lead has responded. Identify what service they need. Ask naturally — don't list all services at once.",
+    State.GREETING_SENT:
+        "The lead has responded. Identify what service they need. Ask naturally. Do not list all services at once.",
 
-    State.SERVICE_IDENTIFIED: "You have identified the service. Explain the service briefly and mention the pay-in-stages model naturally. Ask for their proposed business/organization name.",
+    State.SERVICE_IDENTIFIED:
+        "You have identified the service they need. Briefly explain the service and the 3-stage payment model. Then ask for their proposed business or organization name. Be conversational — not a lecture.",
 
-    State.WAITING_BUSINESS_NAME: "You are waiting for their proposed business name. If they haven't provided it yet, ask for it naturally. Accept 2-3 name options.",
+    State.WAITING_BUSINESS_NAME:
+        "You are waiting for their proposed business name. If not yet provided, ask for it naturally. Mention they can provide 2 to 3 options.",
 
-    State.BUSINESS_NAME_RECEIVED: "You have received their business name. Now ask naturally about the nature of their business — what products or services they'll be offering.",
+    State.BUSINESS_NAME_RECEIVED:
+        "You have received their proposed business name. If the service requires it, ask naturally for the nature of the business — what products or services they will offer.",
 
-    State.WAITING_NATURE: "Ask for the nature of the business if not yet provided. Be conversational.",
+    State.WAITING_NATURE:
+        "Ask for the nature of the business if not yet provided. Keep it conversational.",
 
-    State.WAITING_PHONE: "Ask for their phone number naturally. You can say you need it for updates and documentation.",
+    State.LEAD_QUALIFIED:
+        "You have collected everything needed. Warmly confirm receipt and let them know the team will run a CAC name availability check and be in touch shortly. Make them feel confident and taken care of.",
 
-    State.WAITING_EMAIL: "Ask for their email address. Let them know it's needed for their certificate and correspondence.",
+    State.WAITING_HUMAN_REVIEW:
+        "A consultant will follow up shortly with the name availability result. Invite any final questions while they wait.",
 
-    State.LEAD_QUALIFIED: "Excellent — you have all the information needed. Warmly confirm you have everything and let them know the team will run a name availability check and be in touch shortly. Make them feel confident and excited.",
+    State.HUMAN_ACTIVE:
+        "A human consultant is now handling this conversation. Do not respond unless explicitly reactivated.",
 
-    State.WAITING_HUMAN_REVIEW: "The consultant will follow up soon with the name availability result. Reassure the lead and invite any final questions.",
+    State.NAME_AVAILABLE:
+        "The name is available! Congratulate them warmly and explain the initial payment needed to reserve the name and begin registration.",
 
-    State.HUMAN_ACTIVE: "A human consultant is now handling this conversation. Do not respond unless explicitly reactivated.",
+    State.NAME_UNAVAILABLE:
+        "The name is not available. Empathetically explain and ask for alternative name options — 2 to 3 alternatives if possible.",
 
-    State.NAME_AVAILABLE: "The name is available! Congratulate them and explain the initial payment needed to reserve the name.",
+    State.WAITING_PAYMENT:
+        "Provide the payment details clearly and warmly. Reassure them that registration begins immediately after payment confirmation.",
 
-    State.NAME_UNAVAILABLE: "The name is not available. Empathetically explain and ask for alternative name options.",
+    State.REGISTRATION_IN_PROGRESS:
+        "Registration is in progress. Give a warm status update and set clear timeline expectations.",
 
-    State.WAITING_INITIAL_PAYMENT: "Explain the initial payment clearly with account details. Reassure them registration begins immediately after confirmation.",
+    State.WAITING_BALANCE:
+        "Their certificate is ready! Congratulate them and explain the balance payment needed to receive it.",
 
-    State.REGISTRATION_IN_PROGRESS: "Registration is in progress. Give a warm status update and set timeline expectations.",
-
-    State.WAITING_BALANCE_PAYMENT: "Their certificate is ready! Congratulate them and explain the balance payment needed for delivery.",
-
-    State.COMPLETED: "Registration is complete. Celebrate with them, thank them for choosing Degenius, and mention referral opportunities.",
+    State.COMPLETED:
+        "Registration is complete. Celebrate with them, thank them for choosing Degenius Consult LTD, and mention the referral opportunity.",
 }
