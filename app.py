@@ -1,5 +1,7 @@
 from flask import Flask
+from datetime import timedelta
 import atexit
+
 from config.settings import Config
 from database.connection import init_pool
 from database.schema import init_db
@@ -15,31 +17,28 @@ logger = get_logger("app")
 def create_app():
     app = Flask(__name__)
     app.secret_key = Config.FLASK_SECRET_KEY
+    app.permanent_session_lifetime = timedelta(hours=8)
 
-    # Initialize database
+    # Database
     init_pool()
     init_db()
 
-    # Register blueprints
+    # Blueprints
     app.register_blueprint(webhook_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(control_bp)
     app.register_blueprint(conversation_bp)
 
-    # Home route
-    @app.route("/", methods=["GET"])
+    @app.route("/")
     def home():
-        return "Degenius WhatsApp AI Agent is running! ✅", 200
+        return "Degenius WhatsApp AI Agent ✅", 200
 
-    # Health check
-    @app.route("/health", methods=["GET"])
+    @app.route("/health")
     def health():
-        return {"status": "healthy", "service": "Degenius WhatsApp Bot"}, 200
+        return {"status": "healthy"}, 200
 
-    # Start scheduler
     _start_scheduler()
-
-    logger.info("Degenius WhatsApp AI Agent started successfully.")
+    logger.info("Degenius WhatsApp AI Agent started.")
     return app
 
 
@@ -49,17 +48,12 @@ def _start_scheduler():
         from scheduler.jobs import run_followups, run_daily_report
 
         scheduler = BackgroundScheduler(timezone="Africa/Lagos")
-        scheduler.add_job(run_followups, 'interval', hours=1, id='followup_job')
-        scheduler.add_job(
-            run_daily_report,
-            'cron',
-            hour=Config.REPORT_HOUR,
-            minute=0,
-            id='report_job'
-        )
+        scheduler.add_job(run_followups, "interval", hours=1, id="followup")
+        scheduler.add_job(run_daily_report, "cron",
+                          hour=Config.REPORT_HOUR, minute=0, id="report")
         scheduler.start()
         atexit.register(lambda: scheduler.shutdown(wait=False))
-        logger.info("Scheduler started — follow-ups every hour, report at 7AM WAT")
+        logger.info("Scheduler started.")
     except Exception as e:
         logger.error(f"Scheduler error: {e}")
 
