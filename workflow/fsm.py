@@ -1,116 +1,105 @@
 import json
-from datetime import datetime
-from database.connection import DatabaseContext
-from workflow.states import State, VALID_TRANSITIONS, STATE_INSTRUCTIONS, STATE_REQUIREMENTS
+from database.connection import DB
+from database.models import update_conversation, update_customer, update_collected_fields, log_activity
+from workflow.states import State, VALID_TRANSITIONS, STATE_INSTRUCTIONS
+from config.business_loader import identify_service, get_services
 from utils.logger import get_logger
 
 logger = get_logger("fsm")
 
 
-class ConversationFSM:
+class FSM:
     """
-    Finite State Machine that controls the conversation workflow.
-    The FSM — not Claude — decides what stage the conversation is in
-    and what Claude should ask next.
+    Finite State Machine controlling the entire conversation workflow.
+    The FSM owns the business logic. Claude only generates language.
     """
 
-    def __init__(self, phone: str):
+    def __init__(self, phone: str, customer: dict):
         self.phone = phone
-        self.state = State.NEW_LEAD
-        self.collected = {}
-        self._load()
-
-    def _load(self):
-        """Load current state and collected data from database."""
-        try:
-            with DatabaseContext() as cursor:
-                cursor.execute(
-                    "SELECT fsm_state, collected_fields FROM conversations WHERE phone = %s",
-                    (self.phone,)
-                )
-                row = cursor.fetchone()
-                if row:
-                    self.state = State(row[0])
-                    self.collected = json.loads(row[1]) if row[1] else {}
-        except Exception as e:
-            logger.error(f"FSM load error for {self.phone}: {e}")
-
-    def _save(self):
-        """Persist current state to database."""
-        try:
-            with DatabaseContext() as cursor:
-                cursor.execute("""
-                    INSERT INTO conversations (phone, fsm_state, collected_fields, updated_at)
-                    VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
-                    ON CONFLICT (phone)
-                    DO UPDATE SET
-                        fsm_state = EXCLUDED.fsm_state,
-                        collected_fields = EXCLUDED.collected_fields,
-                        updated_at = CURRENT_TIMESTAMP
-                """, (self.phone, self.state.value, json.dumps(self.collected)))
-        except Exception as e:
-            logger.error(f"FSM save error for {self.phone}: {e}")
+        self.state = State(customer.get("fsm_state", State.NEW_LEAD))
+        self.collected = dict(customer.get("collected_fields") or {})
+        self.customer = customer
 
     def transition(self, new_state: State) -> bool:
-        """Attempt a state transition. Returns True if successful."""
         allowed = VALID_TRANSITIONS.get(self.state, [])
         if new_state in allowed:
-            logger.info(f"[{self.phone}] FSM: {self.state} → {new_state}")
+            logger.info(f"[{self.phone}] {self.state} → {new_state}")
             self.state = new_state
-            self._save()
-            self._log_activity(f"State transition to {new_state.value}")
+            update_conversation(self.phone, fsm_state=self.state.value)
+            log_activity(self.phone, f"transition_{new_state.value}")
             return True
-        logger.warning(f"[{self.phone}] Invalid transition: {self.state} → {new_state}")
+        logger.warning(f"[{self.phone}] Blocked transition: {self.state} → {new_state}")
         return False
 
-    def update_collected(self, field: str, value: str):
-        """Store a collected field value."""
-        if value and value.strip():
-            self.collected[field] = value.strip()
-            self._save()
-            logger.info(f"[{self.phone}] Collected '{field}': {value[:50]}")
+    def store(self, field: str, value: str):
+        if value and str(value).strip():
+            self.collected[field] = str(value).strip()
+            update_collected_fields(self.phone, {field: str(value).strip()})
+            logger.info(f"[{self.phone}] Stored '{field}'")
 
-    def is_field_collected(self, field: str) -> bool:
+    def has(self, field: str) -> bool:
         return bool(self.collected.get(field))
 
     def get_instruction(self) -> str:
-        """Return the instruction Claude should follow for current state."""
         return STATE_INSTRUCTIONS.get(self.state, "Continue the conversation naturally.")
 
-    def get_required_field(self) -> str:
-        """Return the field name Claude needs to collect at current state."""
-        return STATE_REQUIREMENTS.get(self.state, "")
+    def is_paused(self) -> bool:
+        return bool(self.customer.get("ai_paused"))
 
-    def advance_from_collected(self, claude_data: dict) -> bool:
+    def pause(self):
+        update_customer(self.phone, ai_paused=True)
+        log_activity(self.phone, "bot_paused")
+        logger.info(f"[{self.phone}] Bot PAUSED")
+
+    def resume(self):
+        update_customer(self.phone, ai_paused=False)
+        log_activity(self.phone, "bot_resumed")
+        logger.info(f"[{self.phone}] Bot RESUMED")
+
+    def process_extracted(self, extracted: dict) -> bool:
         """
-        Use Claude's structured response to update collected fields
-        and advance the FSM state automatically.
+        Apply extracted data from Claude and advance FSM automatically.
+        Returns True if state advanced.
         """
-        customer_data = claude_data.get("customer_data", {})
         advanced = False
 
-        # Update any newly collected fields
+        # Store any newly extracted values
         field_map = {
+            "customer_name": "customer_name",
+            "service": "service_requested",
             "business_name": "proposed_business_name",
             "nature": "nature_of_business",
-            "phone": "phone_number",
-            "email": "email_address",
-            "name": "customer_name",
-            "service": "service_requested",
         }
+        for claude_key, store_key in field_map.items():
+            value = extracted.get(claude_key, "")
+            if value and not self.has(store_key):
+                self.store(store_key, value)
+                # Sync to customer profile
+                if store_key == "customer_name":
+                    update_customer(self.phone, full_name=value)
+                elif store_key == "service_requested":
+                    update_customer(self.phone, service_requested=value)
+                elif store_key == "proposed_business_name":
+                    update_customer(self.phone, business_name=value)
+                elif store_key == "nature_of_business":
+                    update_customer(self.phone, nature_of_business=value)
 
-        for claude_key, db_key in field_map.items():
-            value = customer_data.get(claude_key, "")
-            if value and not self.is_field_collected(db_key):
-                self.update_collected(db_key, value)
+        # Identify service from message if not yet stored
+        if not self.has("service_requested"):
+            raw_text = extracted.get("raw_message", "")
+            if raw_text:
+                detected = identify_service(raw_text)
+                if detected:
+                    self.store("service_requested", detected)
+                    update_customer(self.phone, service_requested=detected)
 
-        # Advance state based on what's now collected
+        # FSM advancement logic
         if self.state == State.NEW_LEAD:
             self.transition(State.GREETING_SENT)
             advanced = True
 
         elif self.state == State.GREETING_SENT:
-            if self.collected.get("service_requested"):
+            if self.has("service_requested"):
                 self.transition(State.SERVICE_IDENTIFIED)
                 advanced = True
 
@@ -119,71 +108,32 @@ class ConversationFSM:
             advanced = True
 
         elif self.state == State.WAITING_BUSINESS_NAME:
-            if self.collected.get("proposed_business_name"):
+            if self.has("proposed_business_name"):
                 self.transition(State.BUSINESS_NAME_RECEIVED)
-                self.transition(State.WAITING_NATURE)
                 advanced = True
+
+        elif self.state == State.BUSINESS_NAME_RECEIVED:
+            service_key = self.collected.get("service_requested", "")
+            services = get_services()
+            needs_nature = any(
+                s["key"] == service_key and s.get("requires_nature")
+                for s in services.get("registration", [])
+            )
+            if needs_nature and not self.has("nature_of_business"):
+                self.transition(State.WAITING_NATURE)
+            else:
+                self.transition(State.LEAD_QUALIFIED)
+            advanced = True
 
         elif self.state == State.WAITING_NATURE:
-            if self.collected.get("nature_of_business"):
-                self.transition(State.WAITING_PHONE)
-                advanced = True
-
-        elif self.state == State.WAITING_PHONE:
-            if self.collected.get("phone_number"):
-                self.transition(State.WAITING_EMAIL)
-                advanced = True
-
-        elif self.state == State.WAITING_EMAIL:
-            if self.collected.get("email_address"):
+            if self.has("nature_of_business"):
                 self.transition(State.LEAD_QUALIFIED)
                 advanced = True
 
         return advanced
 
-    def is_lead_qualified(self) -> bool:
+    def is_qualified(self) -> bool:
         return self.state == State.LEAD_QUALIFIED
-
-    def is_paused(self) -> bool:
-        try:
-            with DatabaseContext() as cursor:
-                cursor.execute(
-                    "SELECT ai_paused FROM customers WHERE phone = %s",
-                    (self.phone,)
-                )
-                row = cursor.fetchone()
-                return row[0] if row else False
-        except Exception as e:
-            logger.error(f"Pause check error: {e}")
-            return False
-
-    def pause(self):
-        self._set_pause(True)
-
-    def resume(self):
-        self._set_pause(False)
-
-    def _set_pause(self, paused: bool):
-        try:
-            with DatabaseContext() as cursor:
-                cursor.execute(
-                    "UPDATE customers SET ai_paused = %s WHERE phone = %s",
-                    (paused, self.phone)
-                )
-            label = "PAUSED" if paused else "RESUMED"
-            logger.info(f"[{self.phone}] Bot {label}")
-        except Exception as e:
-            logger.error(f"Pause set error: {e}")
-
-    def _log_activity(self, event: str, details: dict = None):
-        try:
-            with DatabaseContext() as cursor:
-                cursor.execute(
-                    "INSERT INTO activity_log (phone, event_type, details) VALUES (%s, %s, %s)",
-                    (self.phone, event, json.dumps(details or {}))
-                )
-        except Exception as e:
-            logger.error(f"Activity log error: {e}")
 
     def to_dict(self) -> dict:
         return {
