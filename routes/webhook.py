@@ -1,137 +1,21 @@
 import json
 from flask import Blueprint, request
-from workflow.fsm import ConversationFSM
+from database.models import (
+    ensure_customer, get_customer, save_message,
+    get_recent_messages, update_customer, log_activity
+)
+from workflow.fsm import FSM
+from workflow.handover import trigger_handover
 from workflow.states import State
-from services.whatsapp import WhatsAppService
+from services.whatsapp import send_text, mark_read, handle_media
 from services.claude_service import get_response
+from services.lead_parser import parse_from_message
 from services.notification import notify_new_lead, notify_lead_qualified
-from database.connection import DatabaseContext
 from config.settings import Config
 from utils.logger import get_logger
 
 webhook_bp = Blueprint("webhook", __name__)
 logger = get_logger("webhook")
-
-
-def ensure_customer_exists(phone: str):
-    """Create customer record if not exists."""
-    try:
-        with DatabaseContext() as cursor:
-            cursor.execute(
-                "INSERT INTO customers (phone) VALUES (%s) ON CONFLICT (phone) DO NOTHING",
-                (phone,)
-            )
-    except Exception as e:
-        logger.error(f"Customer create error: {e}")
-
-
-def update_customer_from_collected(phone: str, collected: dict):
-    """Sync collected fields to customer profile."""
-    try:
-        with DatabaseContext() as cursor:
-            cursor.execute("""
-                UPDATE customers SET
-                    full_name = COALESCE(NULLIF(%s,''), full_name),
-                    email = COALESCE(NULLIF(%s,''), email),
-                    service_requested = COALESCE(NULLIF(%s,''), service_requested),
-                    business_name = COALESCE(NULLIF(%s,''), business_name),
-                    nature_of_business = COALESCE(NULLIF(%s,''), nature_of_business),
-                    lead_stage = %s,
-                    last_customer_message_at = CURRENT_TIMESTAMP,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE phone = %s
-            """, (
-                collected.get('customer_name', ''),
-                collected.get('email_address', ''),
-                collected.get('service_requested', ''),
-                collected.get('proposed_business_name', ''),
-                collected.get('nature_of_business', ''),
-                collected.get('fsm_state', 'new_lead'),
-                phone
-            ))
-    except Exception as e:
-        logger.error(f"Customer update error: {e}")
-
-
-def save_message(phone: str, role: str, content: str, state: str):
-    """Save individual message to messages table."""
-    try:
-        with DatabaseContext() as cursor:
-            cursor.execute(
-                "INSERT INTO messages (phone, role, content, fsm_state) VALUES (%s, %s, %s, %s)",
-                (phone, role, content, state)
-            )
-            cursor.execute(
-                "UPDATE conversations SET total_messages = total_messages + 1 WHERE phone = %s",
-                (phone,)
-            )
-    except Exception as e:
-        logger.error(f"Message save error: {e}")
-
-
-def get_recent_messages(phone: str, limit: int = 10) -> list:
-    """Retrieve recent messages for Claude context."""
-    try:
-        with DatabaseContext() as cursor:
-            cursor.execute("""
-                SELECT role, content FROM messages
-                WHERE phone = %s
-                ORDER BY created_at DESC
-                LIMIT %s
-            """, (phone, limit))
-            rows = cursor.fetchall()
-            return [{"role": r[0], "content": r[1]} for r in reversed(rows)]
-    except Exception as e:
-        logger.error(f"Get messages error: {e}")
-        return []
-
-
-def has_been_notified_new(phone: str) -> bool:
-    try:
-        with DatabaseContext() as cursor:
-            cursor.execute(
-                "SELECT notified_new FROM conversations WHERE phone = %s",
-                (phone,)
-            )
-            row = cursor.fetchone()
-            return row[0] if row else False
-    except:
-        return False
-
-
-def mark_notified_new(phone: str):
-    try:
-        with DatabaseContext() as cursor:
-            cursor.execute(
-                "UPDATE conversations SET notified_new = TRUE WHERE phone = %s",
-                (phone,)
-            )
-    except Exception as e:
-        logger.error(f"Mark notified error: {e}")
-
-
-def mark_notified_qualified(phone: str):
-    try:
-        with DatabaseContext() as cursor:
-            cursor.execute(
-                "UPDATE conversations SET notified_qualified = TRUE WHERE phone = %s",
-                (phone,)
-            )
-    except Exception as e:
-        logger.error(f"Mark qualified error: {e}")
-
-
-def has_been_notified_qualified(phone: str) -> bool:
-    try:
-        with DatabaseContext() as cursor:
-            cursor.execute(
-                "SELECT notified_qualified FROM conversations WHERE phone = %s",
-                (phone,)
-            )
-            row = cursor.fetchone()
-            return row[0] if row else False
-    except:
-        return False
 
 
 @webhook_bp.route("/webhook", methods=["GET"])
@@ -149,108 +33,114 @@ def verify():
 @webhook_bp.route("/webhook", methods=["POST"])
 def receive():
     data = request.get_json()
-    logger.info(f"Webhook received: {json.dumps(data)[:500]}")
+    logger.info(f"Webhook: {json.dumps(data)[:400]}")
 
     try:
         entry = data["entry"][0]
         changes = entry["changes"][0]
         value = changes["value"]
 
-        # Ignore delivery/read status updates
+        # Ignore status updates
         if "statuses" in value and "messages" not in value:
             return "OK", 200
 
         if "messages" not in value:
             return "OK", 200
 
-        message = value["messages"][0]
-        phone = message["from"]
-        message_type = message.get("type", "")
-        message_id = message.get("id", "")
+        msg = value["messages"][0]
+        phone = msg["from"]
+        msg_type = msg.get("type", "")
+        msg_id = msg.get("id", "")
 
-        logger.info(f"Message from +{phone} — type: {message_type}")
+        logger.info(f"From +{phone} | Type: {msg_type}")
 
-        # Mark as read
-        if message_id:
-            WhatsAppService.mark_read(message_id)
+        # Mark read
+        if msg_id:
+            mark_read(msg_id)
 
-        # Handle non-text messages
-        if message_type != "text":
-            WhatsAppService.handle_media_message(phone, message_type)
+        # Handle non-text
+        if msg_type != "text":
+            handle_media(phone, msg_type)
             return "OK", 200
 
-        user_message = message["text"]["body"].strip()
+        user_message = msg["text"]["body"].strip()
         if not user_message:
             return "OK", 200
 
-        # Ensure customer exists
-        ensure_customer_exists(phone)
+        # Ensure records exist
+        ensure_customer(phone)
 
-        # Load FSM
-        fsm = ConversationFSM(phone)
+        # Load customer state
+        customer = get_customer(phone)
+        fsm = FSM(phone, customer)
 
-        # Check if bot is paused
+        # Skip if bot is paused
         if fsm.is_paused():
-            logger.info(f"Bot paused for +{phone} — skipping AI")
+            logger.info(f"Bot paused for +{phone} — skipping.")
             return "OK", 200
 
-        # Notify on first message
-        if not has_been_notified_new(phone):
-            notify_new_lead(phone)
-            mark_notified_new(phone)
+        # Update last message timestamp
+        update_customer(phone, last_message_at="CURRENT_TIMESTAMP")
 
-        # Save user message
+        # Notify on first message
+        if not customer.get("notified_new"):
+            notify_new_lead(phone)
+            from database.models import update_conversation
+            update_conversation(phone, notified_new=True)
+
+        # Save incoming message
         save_message(phone, "user", user_message, fsm.state.value)
 
-        # Get recent messages for context
+        # Quick parse for obvious extractions
+        quick_extracted = parse_from_message(
+            user_message,
+            fsm.state.value,
+            fsm.collected
+        )
+
+        # Get recent messages for Claude context
         recent = get_recent_messages(phone, limit=8)
 
-        # Get instruction from FSM
-        instruction = fsm.get_instruction()
-
-        # Get Claude structured response
+        # Get Claude response
+        service_key = fsm.collected.get("service_requested", "")
         claude_data = get_response(
             phone=phone,
             user_message=user_message,
-            fsm_state=fsm.state,
-            instruction=instruction,
+            state=fsm.state,
+            instruction=fsm.get_instruction(),
             collected=fsm.collected,
-            recent_messages=recent[:-1]  # Exclude the message we just added
+            recent_messages=recent[:-1] if recent else [],
+            service_key=service_key
         )
 
-        # Extract reply
-        reply = claude_data.get("reply", "").strip()
+        # Merge extracted data
+        combined = {**quick_extracted}
+        claude_customer = claude_data.get("customer_data", {})
+        for k, v in claude_customer.items():
+            if v and k not in combined:
+                combined[k] = v
+
+        # Advance FSM
+        fsm.process_extracted(combined)
+
+        # Extract and send reply
+        reply = (claude_data.get("reply") or "").strip()
         if not reply:
-            reply = "Hey! Just give me one second. 😊"
+            reply = "Hey! Just give me a moment. 😊"
 
-        # Update FSM from Claude's extracted data
-        fsm.advance_from_collected(claude_data)
-
-        # Update customer profile
-        update_customer_from_collected(phone, {**fsm.collected, "fsm_state": fsm.state.value})
-
-        # Save AI message
         save_message(phone, "assistant", reply, fsm.state.value)
+        send_text(phone, reply)
 
-        # Send reply to WhatsApp
-        WhatsAppService.send_text(phone, reply)
-
-        # Handle lead qualified
-        if (fsm.is_lead_qualified() and not has_been_notified_qualified(phone)):
-            notify_lead_qualified(phone, fsm.collected)
-            mark_notified_qualified(phone)
-            # Auto-pause bot — human should review
-            fsm.pause()
-            logger.info(f"Bot auto-paused for qualified lead +{phone}")
-
-        # Handle explicit handover request
-        elif claude_data.get("handover_required") and not has_been_notified_qualified(phone):
-            notify_lead_qualified(phone, fsm.collected)
-            mark_notified_qualified(phone)
-            fsm.pause()
+        # Trigger handover if qualified
+        if fsm.is_qualified() and not customer.get("notified_qualified"):
+            trigger_handover(
+                fsm,
+                notify_fn=notify_lead_qualified
+            )
+            log_activity(phone, "lead_qualified", fsm.collected)
 
     except KeyError as e:
-        logger.error(f"KeyError processing webhook: {e}")
+        logger.error(f"KeyError: {e}")
     except Exception as e:
         import traceback
         logger.error(f"Webhook error: {traceback.format_exc()}")
